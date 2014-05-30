@@ -40,12 +40,38 @@ var app = {
     bleStatus: {
         scanStarted: 0
     },
+    bleDiscoverDroidSuccess: function(status) {
+        var services = status["services"];
+        console.log(services);
+        for (var i=0; i < services.length; i++) {
+            var buf = services[i]["serviceUuid"];
+            for (var j=0; j < services[i]["characteristics"].length; j++) {
+                var chars = services[i]["characteristics"][j];
+                buf += " " + chars["characteristicUuid"] + " descriptors " + chars["descriptors"];
+            }
+            console.log(buf);
+        }
+    },
+    bleConnectSuccess: function(status) {
+        console.log("bleConnectSuccess: " + status["status"] + " " + device.platform);
+        if (status["status"] != "connected")
+            return;
+        if (device.platform == "Android")
+            bluetoothle.discover(app.bleDiscoverDroidSuccess, app.bleFail);
+    },
+    bleConnect: function(e) {
+        var target = e.target || e.srcElement;
+        if (target.nodeName != 'A')
+            return false;
+        bluetoothle.connect(app.bleConnectSuccess, app.bleFail, { "address": target.dataset.address });
+        return false;
+    },
     bleScanStop: function() {
         var elContainer = document.getElementById("bledevices");
         elContainer.innerHTML = "";
         for (var key in app.bleDevices) {
             var el = app.bleDevices[key];
-            elContainer.innerHTML += "<p>address:"+ el.address + " name:" + el.name + " rssi:" + el.rssi + "</p>";
+            elContainer.innerHTML += "<a class='bledevice' data-address='"+ el.address +"' href=''>address:"+ el.address + " name:" + el.name + " rssi:" + el.rssi + "</a><br />";
         }
     },
     bleScanUpdate: function(status) {
@@ -63,11 +89,11 @@ var app = {
         };
 
         var now = Date.now();
-        /* stop scanning after one minute */
+        // stop scanning after one minute
         if (now - app.bleStatus.scanStarted > 60)
             bluetoothle.stopScan(app.bleScanStop, app.bleFail);
     },
-    bleInit: function(status) {
+    bleScan: function(status) {
         bluetoothle.startScan(app.bleScanUpdate, app.bleFail, {});
         app.bleStatus.scanStarted = Date.now();
     },
@@ -76,15 +102,12 @@ var app = {
     },
     // Update DOM on a Received Event
     receivedEvent: function(id) {
-        var parentElement = document.getElementById(id);
-        var listeningElement = parentElement.querySelector('.listening');
-        var receivedElement = parentElement.querySelector('.received');
+        bluetoothle.initialize(app.bleScan, app.bleFail);
 
-        listeningElement.setAttribute('style', 'display:none;');
-        receivedElement.setAttribute('style', 'display:block;');
+        var rescan = document.getElementById("blerescan");
+        rescan.addEventListener('click', app.bleScan, false);
 
-        console.log('Received Event: ' + id);
-
-        bluetoothle.initialize(app.bleInit, app.bleFail);
+        var devices = document.getElementById("bledevices");
+        devices.addEventListener('click', app.bleConnect, false);
     }
 };
